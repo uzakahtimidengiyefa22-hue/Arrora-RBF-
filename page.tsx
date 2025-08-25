@@ -1,53 +1,40 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "../../lib/supabaseClient";
 
-export default function LoginPage() {
-  const router = useRouter();
-  const params = useSearchParams();
-  const redirect = params.get("redirect") || "/dashboard";
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+export default function AdminDashboard() {
+  const [deals, setDeals] = useState([]);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace(redirect);
-    });
-  }, [redirect, router]);
+  async function load() {
+    const res = await fetch("/api/admin/deals");
+    if (res.ok) setDeals(await res.json());
+  }
+  useEffect(() => { load(); }, []);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setLoading(true);
-    setMessage("");
-    const { data: signIn, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
-    if (!signInErr && signIn.session) {
-      router.replace(redirect);
-      return;
-    }
-    // Try sign up automatically
-    const { data: signUp, error: signUpErr } = await supabase.auth.signUp({ email, password });
-    if (signUpErr) {
-      setMessage(signUpErr.message);
-    } else {
-      setMessage("Check your email to confirm your account. After confirming, come back and log in.");
-    }
-    setLoading(false);
+  async function action(id, type) {
+    const res = await fetch(`/api/admin/deals/${id}/${type}`, { method: "POST" });
+    if (res.ok) load();
+    else alert("Action failed");
   }
 
   return (
     <main className="min-h-screen">
-      <div className="container py-10">
-        <div className="max-w-md mx-auto card p-6">
-          <h1 className="text-2xl font-bold mb-4">Login / Sign up</h1>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full" />
-            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full" />
-            <button disabled={loading} className="bg-brand-600 text-white px-4 py-2 w-full">{loading ? "Processing..." : "Login / Sign up"}</button>
-          </form>
-          {message && <p className="mt-3 text-sm text-gray-700">{message}</p>}
+      <div className="container py-8">
+        <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
+        <div className="card p-4">
+          {deals.map((d) => (
+            <div key={d.id} className="flex items-center justify-between border-b py-3">
+              <div>
+                <div className="font-semibold">{d.company_name}</div>
+                <div className="text-sm text-gray-600">{d.contact_email}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm mr-2">{d.status}</span>
+                <button onClick={() => action(d.id, "approve")} className="bg-emerald-600 text-white px-3 py-1 rounded-2xl">Approve</button>
+                <button onClick={() => action(d.id, "reject")} className="bg-rose-600 text-white px-3 py-1 rounded-2xl">Reject</button>
+              </div>
+            </div>
+          ))}
+          {deals.length === 0 && <p>No deals yet.</p>}
         </div>
       </div>
     </main>
